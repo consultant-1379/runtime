@@ -1,0 +1,21 @@
+<project name="runtime" default="test_all">
+    <property name="module.name" value="runtime"/>
+    <property file="${user.home}/EniqBuild/BH/build.properties"/>
+    <property name="ant.common" value="${cc.base}/tools/ant_common"/>
+    <property file="${ant.common}/common.properties"/>
+    <property name="module.build" value="${module.runtime.build}"/>
+    <property name="module.base" value="${module.runtime.base}"/>
+    <property name="module.dependants" value="${module.runtime.dependants}"/>
+    <import file="${ant.common}/common.xml"/>
+    <property name="tests.to.run" value="**/*Test.class"/>
+
+    <property name="mods.needed" value=""/>
+    <path id="runtime.lib.classpath">
+        <path refid="plaform.lib.classpath"/>
+        <path location="${module.repository.pkg}"/>
+    </path>
+    <path id="runtime.test.classpath">
+        <path refid="platform.test.classpath"/>
+        <path refid="runtime.lib.classpath"/>
+    </path>
+</project>

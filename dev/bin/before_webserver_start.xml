@@ -1,0 +1,219 @@
+<project name="before_webserver_start" default="action">
+  <taskdef resource="net/sf/antcontrib/antlib.xml"/>
+  <target name="action">
+    <if>
+      <available file="${dc.runtime.dir}/tomcat/conf/catalina.properties"/>
+      <then>
+        <property file="${dc.runtime.dir}/tomcat/conf/catalina.properties" prefix="previous"/>
+        <path id="shared.classpath">
+          <fileset dir="${dc.platform.dir}">
+            <include name="**/afj_manager-*/dclib/afj_manager.jar"/>
+            <include name="**/common-*/dclib/common.jar"/>
+            <include name="**/common-*/dclib/techpackide.jar"/>
+            <include name="**/dwhmanager-*/dclib/dwhmanager.jar"/>
+            <include name="**/engine-*/dclib/engine.jar"/>
+            <include name="**/libs-*/dclib/commons-configuration-1.1.jar"/>
+            <include name="**/libs-*/dclib/commons-dbcp*.jar"/>
+            <include name="**/libs-*/dclib/commons-lang*.jar"/>
+            <include name="**/libs-*/dclib/commons-logging-1.2.jar"/>
+            <include name="**/libs-*/dclib/jconn*.jar"/>
+            <include name="**/libs-*/dclib/jsch-*.jar"/>
+            <include name="**/libs-*/dclib/log4j-1.2-api-2.17.1.jar"/>
+			<include name="**/libs-*/dclib/log4j-api-2.17.1.jar"/>
+			<include name="**/libs-*/dclib/log4j-core-2.17.1.jar"/>
+            <include name="**/libs-*/dclib/velocity-1.7-dep.jar"/>
+            <include name="**/licensing-*/dclib/licensing.jar"/>
+            <include name="**/repository-*/dclib/repository.jar"/>
+            <include name="**/scheduler-*/dclib/scheduler.jar"/>
+			<include name="**/symboliclinkcreator-*/dclib/symboliclinkcreator.jar"/>
+          </fileset>
+        </path>
+        <!-- create shared.loader path with ENIQ jars -->
+        <pathconvert targetos="unix" property="shared.classpath.string" pathsep=",">
+          <path refid="shared.classpath"/>
+          <identitymapper/>
+        </pathconvert>
+        <property name="old.shared.loader" value="${previous.shared.loader}"/>
+        <var name="new.shared.loader" value=""/>
+        <for list="${shared.classpath.string}" param="shared.jar.name">
+          <sequential>
+            <if>
+              <equals arg1="${new.shared.loader}" arg2=""/>
+              <then>
+                <var name="new.shared.loader" value="@{shared.jar.name}"/>
+              </then>
+              <else>
+                <var name="new.shared.loader" value="${new.shared.loader},@{shared.jar.name}"/>
+              </else>
+            </if>
+          </sequential>
+        </for>
+        <!-- update jarsToSkip with ENIQ jars -->
+        <pathconvert targetos="unix" property="shared.classpath.flatten" pathsep=",">
+          <path refid="shared.classpath"/>
+          <flattenmapper/>
+        </pathconvert>
+        <property name="old.jar.skip.list" value="${previous.tomcat.util.scan.DefaultJarScanner.jarsToSkip}"/>
+        <var name="new.jar.skip.list" value=""/>
+        <for list="${shared.classpath.flatten}" param="skip.jar.name">
+          <sequential>
+            <if>
+              <contains string="${old.jar.skip.list}" substring="@{skip.jar.name}"/>
+              <then>
+                <!-- nothing to do -->
+              </then>
+              <else>
+                <if>
+                  <equals arg1="${new.jar.skip.list}" arg2=""/>
+                  <then>
+                    <var name="new.jar.skip.list" value="@{skip.jar.name}"/>
+                  </then>
+                  <else>
+                    <var name="new.jar.skip.list" value="${new.jar.skip.list},@{skip.jar.name}"/>
+                  </else>
+                </if>
+              </else>
+            </if>
+          </sequential>
+        </for>
+        <propertyfile file="${dc.runtime.dir}/tomcat/conf/catalina.properties">
+          <entry key="shared.loader" default="" operation="=" value="${new.shared.loader}"/>
+        </propertyfile>
+        <if>
+          <equals arg1="${new.jar.skip.list}" arg2=""/>
+          <then>
+          </then>
+          <else>
+            <propertyfile file="${dc.runtime.dir}/tomcat/conf/catalina.properties">
+              <entry key="tomcat.util.scan.DefaultJarScanner.jarsToSkip" default="" operation="=" value="${old.jar.skip.list},${new.jar.skip.list}"/>
+            </propertyfile>
+          </else>
+        </if>
+      </then>
+      <else>
+        <fail message="Tomcat catalina.properties not found, classpath can not be modified!"/>
+      </else>
+    </if>
+    <if>
+      <available file="${dc.runtime.dir}/tomcat/conf/server.xml"/>
+      <then>
+
+        <replace file="${dc.runtime.dir}/tomcat/conf/server.xml" token="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" value="org.apache.catalina.mbeans.EniqGlobalResourcesLifecycleListener"/>
+        
+        <!-- we need next replace because in previous versions class was in different package --><replace file="${dc.runtime.dir}/tomcat/conf/server.xml" token="org.apache.catalina.users.EniqUserDatabaseFactory" value="org.apache.catalina.users.MemoryUserDatabaseFactory"/><replace file="${dc.runtime.dir}/tomcat/conf/server.xml" token="org.apache.catalina.users.MemoryUserDatabaseFactory" value="com.ericsson.catalina.users.EniqUserDatabaseFactory"/>
+		
+        <!--Removing unsupported Listener-->
+        <replace file="${dc.runtime.dir}/tomcat/conf/server.xml" token="&lt;Listener className=&quot;org.apache.catalina.core.JasperListener&quot; /&gt;"/>
+		
+        <loadfile property="server" srcFile="${dc.runtime.dir}/tomcat/conf/server.xml" /> 
+        <if>
+          <not><matches pattern="&lt;Listener[\s\S]*org.apache.catalina.startup.VersionLoggerListener[\s\S]*?/&gt;" string="${server}" /></not>
+          <then>
+            <property name="VersionLoggerListener" value="&lt;!--APR library loader. Documentation at /docs/apr.html --&gt;${line.separator}"/>
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(${VersionLoggerListener})" replace="\1  &lt;Listener className=&quot;org.apache.catalina.startup.VersionLoggerListener&quot; /&gt;"/>
+          </then>
+        </if>
+	
+	<if>
+    	<available file="/eniq/backup/tomcat_back_up/Rollback_Summary"/>
+      	<then>
+			<loadfile property="security_rollback_check" srcFile="/eniq/backup/tomcat_back_up/Rollback_Summary" /> 
+      	</then>
+    </if>
+
+	 <!-- EQEV-58512 ENIQ S Compliance: Automatic deployment of applications must be disabled. -->
+	<if>
+		<matches pattern="AUTO_DEPLOY:FALSE" string="${security_rollback_check}" />
+      	<then>
+	    	<echo message="Auto-deployment Security features has been disabled over the System." />
+	    </then>
+	<else>
+	  	 <replace file="${dc.runtime.dir}/tomcat/conf/server.xml" token="autoDeploy=&quot;true&quot;" value="autoDeploy=&quot;false&quot;"/>
+	</else>
+	</if>
+           <!-- Disabling Shudown port-->
+  	<if>
+		<matches pattern="SHUTDOWN_PORT:FALSE" string="${security_rollback_check}" />
+      	<then>
+	    	<echo message="Shutdown port Security features has been disabled over the System." />
+	    </then>
+	<else>
+	       <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="&lt;Server[\s\S]*port[\s\S]*&quot;SHUTDOWN&quot;&gt;" replace="&lt;Server port=&quot;-1&quot; command=&quot;SHUTDOWN&quot;&gt;"/>
+	</else>
+	</if>
+   
+		
+        <property name="AccessLogValveProp" value="&lt;!--[ ]*(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*/&gt;)[ ]*--&gt;"/>
+        <if>
+          <matches pattern="${AccessLogValveProp}" string="${server}" multiline="true"/>
+          <then>
+            <!--Un-Commenting AccessLogValve-->
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="${AccessLogValveProp}" replace="\1"/>
+			
+            <!--EQEV-58514-->
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*)resolveHosts=&quot;.*?&quot;" replace="\1"/>
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*directory=)&quot;.*?&quot;" replace="\1&quot;/eniq/log/sw_log/adminui/&quot;"/>
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*prefix=)&quot;.*?&quot;" replace="\1&quot;localhost_access_log&quot;"/>
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*suffix=)&quot;.*?&quot;" replace="\1&quot;.log&quot;"/>
+            <replaceregexp file="${dc.runtime.dir}/tomcat/conf/server.xml" match="(&lt;Valve[\s\S]*&quot;org.apache.catalina.valves.AccessLogValve&quot;[\s\S]*pattern=)&quot;.*?&quot;" replace="\1&quot;%a %u %{yyyy-MM-dd hh:mm:ss}t &amp;quot;%r&amp;quot; %s %D&quot;"/>
+          </then>
+        </if>	
+		
+      </then>
+      <else>
+        <fail message="Tomcat server.xml not found, userdatabase information can not be modified!"/>
+      </else>
+    </if>
+    <if>
+      <available file="${dc.runtime.dir}/tomcat/webapps/adminui/WEB-INF/classes/logging.properties"/>
+      <then>
+        <var name="filehandlers" value=""/>
+        <if>
+          <available file="${dc.log.dir}/afj_manager" type="dir"/>
+          <then>
+            <if>
+              <equals arg1="${filehandlers}" arg2=""/>
+              <then>
+                <var name="filehandlers" value="1afjmanager.org.apache.juli.FileHandler"/>
+              </then>
+              <else>
+                <var name="filehandlers" value="${filehandlers}, 1afjmanager.org.apache.juli.FileHandler"/>
+              </else>
+            </if>
+          </then>
+        </if>
+        <if>
+          <available file="${dc.log.dir}/busyhourcfg" type="dir"/>
+          <then>
+            <if>
+              <equals arg1="${filehandlers}" arg2=""/>
+              <then>
+                <var name="filehandlers" value="2busyhourcfg.org.apache.juli.FileHandler"/>
+              </then>
+              <else>
+                <var name="filehandlers" value="${filehandlers}, 2busyhourcfg.org.apache.juli.FileHandler"/>
+              </else>
+            </if>
+          </then>
+        </if>
+        <if>
+          <available file="${dc.log.dir}/common" type="dir"/>
+          <then>
+            <if>
+              <equals arg1="${filehandlers}" arg2=""/>
+              <then>
+                <var name="filehandlers" value="3common.org.apache.juli.FileHandler"/>
+              </then>
+              <else>
+                <var name="filehandlers" value="${filehandlers}, 3common.org.apache.juli.FileHandler"/>
+              </else>
+            </if>
+          </then>
+        </if>
+        <propertyfile file="${dc.runtime.dir}/tomcat/webapps/adminui/WEB-INF/classes/logging.properties">
+          <entry key="handlers" default="" operation="=" value="${filehandlers}"/>
+        </propertyfile>
+      </then>
+    </if>
+  </target>
+</project>

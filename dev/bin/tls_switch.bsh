@@ -1,0 +1,394 @@
+#!/bin/bash
+# ********************************************************************
+# Ericsson Radio Systems AB                                     SCRIPT
+# ********************************************************************
+#
+#
+# (c) Ericsson Radio Systems AB 2013 - All rights reserved.
+#
+# The copyright to the computer program(s) herein is the property
+# of Ericsson Radio Systems AB, Sweden. The programs may be used 
+# and/or copied only with the written permission from Ericsson Radio 
+# Systems AB or in accordance with the terms and conditions stipulated 
+# in the agreement/contract under which the program(s) have been 
+# supplied.
+#
+# ********************************************************************
+# Name    : tls_switch.bsh
+# Date    : 08/08/2013
+# Revision: 
+# Purpose : Script that controls the enabling/disabling of TLS/SSL renegotiation.
+#
+# Usage   : tls_switch.bsh
+#
+# ********************************************************************
+#
+# 	Command Section
+#
+# ********************************************************************
+AWK=/usr/bin/awk
+BASENAME=/usr/bin/basename
+BASH=/usr/bin/bash
+CAT=/usr/bin/cat
+CHMOD=/usr/bin/chmod
+CHOWN=/usr/bin/chown
+CLEAR=/usr/bin/clear
+CMP=/usr/bin/cmp
+CP=/usr/bin/cp
+CPIO=/usr/bin/cpio
+DATE=/usr/bin/date
+DIRNAME=/usr/bin/dirname
+DOMAINNAME=/usr/bin/domainname
+DTCONFIG=/usr/dt/bin/dtconfig
+DUMPADM=/usr/sbin/dumpadm
+ECHO=/usr/bin/echo
+EGREP=/usr/bin/egrep
+EJECT=/usr/bin/eject
+ENV=/usr/bin/env
+EXPR=/usr/bin/expr
+FIND=/usr/bin/find
+#commented as the below command is deprecated in Solaris 11
+#FLARCREATE=/usr/sbin/flarcreate
+FORMAT=/usr/sbin/format
+FUSER=/usr/sbin/fuser
+GEGREP=/usr/bin/egrep
+GETENT=/usr/bin/getent
+GETTEXT=/usr/bin/gettext
+GREP=/usr/bin/grep
+GROUPADD=/usr/sbin/groupadd
+GTAR=/usr/sfw/bin/gtar
+GZCAT=/usr/bin/gzcat
+HEAD=/usr/bin/head
+HOSTNAME=/usr/bin/hostname
+ID=/usr/bin/id
+INIT=/usr/sbin/init
+LS=/usr/bin/ls
+MKDIR=/usr/bin/mkdir
+MORE=/usr/bin/more
+MV=/usr/bin/mv
+NAWK=/usr/bin/awk
+PGREP=/usr/bin/pgrep
+PING=/usr/sbin/ping
+PKGADD=/usr/sbin/pkgadd
+PKGINFO=/usr/bin/pkginfo
+PRTCONF=/usr/sbin/prtconf
+PS=/usr/bin/ps
+PWD=/usr/bin/pwd
+RM=/usr/bin/rm
+RCP=/usr/bin/rcp
+RSH=/usr/bin/rsh
+SED=/usr/bin/sed
+SLEEP=/usr/bin/sleep
+SORT=/usr/bin/sort
+SU=/usr/bin/su
+SVCADM=/usr/sbin/svcadm
+SVCCFG=/usr/sbin/svccfg
+SVCS=usr/bin/svcs
+SWAP=/usr/sbin/swap
+SYNC=/usr/sbin/sync
+TAIL=/usr/bin/tail
+TEE=/usr/bin/tee
+TOUCH=/usr/bin/touch
+TPUT=/usr/bin/tput
+UADMIN=/usr/sbin/uadmin
+UNAME=/usr/bin/uname
+USERADD=/usr/sbin/useradd
+#commented as the below command is deprecated in Solaris 11
+#VOLD=/usr/sbin/vold
+WC=/usr/bin/wc
+ZFS=/usr/sbin/zfs
+ZPOOL=/usr/sbin/zpool
+
+# ********************************************************************
+#
+#       Configuration Section
+#
+# ********************************************************************
+
+ENIQ_ENV=niq.rc
+
+# ENIQ Config Directory
+ENIQ_CONF_DIR=/eniq/installation/config
+
+_run_dir_=`$CAT ${ENIQ_CONF_DIR}/${ENIQ_ENV} | $GEGREP "^[[:blank:]]*RT_DIR=" | $NAWK -F\= '{print $2}' | $SED -e 's|"||g'`
+if [ ! "${_run_dir_}" ]; then
+    _err_msg_="Could not read RT_DIR parameter from ${ENIQ_CONF_DIR}/${ENIQ_ENV}"
+    abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+fi
+# Directory containing the various available configs, Tomcat directory is a symbolic link
+CONFIG_DIR=${_run_dir_}/tomcat/conf
+
+#Directory of the currently active Tomcat config
+CURRENT_CONFIG=${CONFIG_DIR}/server.xml
+
+# ENIQ Admin Bin Directory
+ENIQ_ADMIN_BIN_DIR=`$CAT ${ENIQ_CONF_DIR}/${ENIQ_ENV} | $GEGREP "^[[:blank:]]*ADMIN_BIN=" | $NAWK -F\= '{print $2}' | $SED -e 's|"||g'`
+if [ ! "${ENIQ_ADMIN_BIN_DIR}" ]; then
+    _err_msg_="Could not read ADMIN_BIN parameter from ${ENIQ_CONF_DIR}/${ENIQ_ENV}"
+    abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+fi
+
+# ********************************************************************
+#
+# 	Functions
+#
+# ********************************************************************
+
+### Function: abort_script ###
+#
+#   This will is called if the script is aborted thru an error
+#   error signal sent by the kernel such as CTRL-C or if a serious
+#   error is encountered during runtime
+#
+# Arguments:
+#       $1 - Error message from part of program (Not always used)
+# Return Values:
+#       none
+abort_script()
+{
+_err_time_=`$DATE '+%Y-%b-%d_%H.%M.%S'`
+
+if [ "$1" ]; then
+    _err_msg_="${_err_time_} - $1"
+else
+    _err_msg_="${_err_time_} - ERROR : Script aborted.......\n"
+fi
+    $ECHO "\nERROR : $_err_msg_\n"
+exit 1
+}
+
+### Function: disable_renegotiation ###
+#
+#   This will disable the security if it is currently enables
+#
+# Arguments:
+#       None
+# Return Values:
+#       None
+disable_renegotiation()
+{
+	#Check to see if the disabled config is already active, if so nothing required
+	$GREP "RENEGOTIATION DISABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+	
+		#checking to see if it our version of the server.xml, if it isn't then we don't want to back it up
+		$GREP "RENEGOTIATION ENABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			$ECHO "This is the first time the script has run, backing up the default xml"
+			$CP ${CURRENT_CONFIG} ${CONFIG_DIR}/orig_server.xml			
+		#Compare the checksum of the active with the config with the equivalent saved config to see if it has been modified since it was last used
+		elif [ ${ENABLE_CHKSUM} != ${current_chksum} ]; then		 
+			$ECHO "This config has been modified. Saving it in ${CONFIG_DIR} as a custom Enable config."		
+			#append custom and timestamp to a version of the enable config and save it in the directory, overwriting the old custom config.
+			$CP ${CURRENT_CONFIG} ${CONFIG_DIR}/custom_enable_server.xml
+		fi
+	 $ECHO "copying ${DISABLE_CONFIG} to overwrite ${CURRENT_CONFIG}"
+		$CP ${DISABLE_CONFIG} ${CURRENT_CONFIG}
+		if [ $? -ne 0 ]; then
+			_err_msg_="Could not copy ${DISABLE_CONFIG} to replace ${CURRENT_CONFIG}"
+			abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+		fi
+		
+	#restart the webserver service
+	webserver restart
+	if [ $? -ne 0 ]; then
+		_err_msg_="Could not restart the webserver"
+		abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+	fi	
+	$ECHO "TLS/SSL Renegotiation has been successfully disabled."	
+
+	else
+		$ECHO "TLS/SSL Renegotiation is already disabled, no action needed."
+		exit 0
+	fi
+}
+
+### Function: enable_renegotiation ###
+#
+#   This will enable the security if it is currently disabled
+#
+# Arguments:
+#       None
+# Return Values:
+#       None
+enable_renegotiation()
+{	
+	#Check to see if the enabled config is already active, if so nothing required
+	$GREP "RENEGOTIATION ENABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+	if [ $? -ne 0 ]; then	
+		#checking to see if it our version of the server.xml, if it isn't then we don't want to back it up
+		$GREP "RENEGOTIATION DISABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			$ECHO "This is the first time the script has run, backing up the default xml"
+			$CP ${CURRENT_CONFIG} ${CONFIG_DIR}/orig_server.xml
+			
+	 	#Compare the checksum of the active with the config with the equivalent saved config to see if it has been modified since it was last used
+		elif [ ${DISABLE_CHKSUM} != ${current_chksum} ]; then		 
+			$ECHO "This config has been modified. Saving it in ${CONFIG_DIR} as a custom Disable config."
+			
+			#append custom and timestamp to a version of the enable config and save it in the directory, overwriting the old custom config.
+			$CP ${CURRENT_CONFIG} ${CONFIG_DIR}/custom_disable_server.xml
+		fi
+	 	$ECHO "copying ${ENABLE_CONFIG} to overwrite ${CURRENT_CONFIG}"
+		$CP ${ENABLE_CONFIG} ${CURRENT_CONFIG}
+		if [ $? -ne 0 ]; then
+			_err_msg_="Could not copy ${ENABLE_CONFIG} to replace ${CURRENT_CONFIG}"
+			abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+		fi
+		
+	#restart the webserver service
+	webserver restart
+	if [ $? -ne 0 ]; then
+		_err_msg_="Could not restart the webserver"
+		abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+	fi	
+	$ECHO "TLS/SSL Renegotiation has been successfully enabled."
+			
+
+	else
+		$ECHO "TLS/SSL Renegotiation is already enabled, no action needed."
+		exit 0
+	fi
+}
+
+### Function: tls_status ###
+#
+#   Print out the current tls renegotiation status
+#
+# Arguments:
+#	none
+# Return Values:
+#	none
+tls_status() 
+{
+#Check if the current config has been set to the enable config
+$GREP "RENEGOTIATION ENABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	$ECHO "TLS/SSL Renegotiation is currently enabled."
+	exit 0
+fi
+
+#Check if the current config has been set to the disable config
+$GREP "RENEGOTIATION DISABLED" ${CURRENT_CONFIG} >> /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	$ECHO "TLS/SSL Renegotiation is currently disabled."
+	exit 0
+fi
+
+# If the funtion has reached this then the default (enabled) config is still set
+$ECHO "The default config is still active, therefore TLS/SSL Renegotiation is currently enabled."
+exit 0
+}
+
+### Function: usage_msg ###
+#
+#   Print out the usage message
+#
+# Arguments:
+#	none
+# Return Values:
+#	none
+usage_msg() 
+{
+$CLEAR
+$ECHO "
+Usage: Run the bash script followed by either of the two parameters mentioned below.
+                      
+options:
+
+enable  : This parameter enables TLS/SSL renegotiation.
+
+disable : This parameter disables TLS/SSL renegotiation.
+
+status  : The parameter checks the current tls renegotiation status
+
+Example:
+
+(root)#:  bash tls_switch.bsh enable
+
+"
+                      
+}
+
+# ********************************************************************
+#
+# 	Main body of program
+#
+# ********************************************************************
+#
+#disable_server.xml - Our new server.xml with the renegotiation disabled
+#custom_disable_server.xml - Our new server.xml with the renegotiation disabled that has been modified and saved
+#
+#enable_server.xml - Our new server.xml with the renegotiation enabled
+#custom_enable_server.xml - Our new server.xml with the renegotiation enabled that has been modified and saved
+
+RUN_TIME=`$DATE '+%Y-%b-%d_%H.%M.%S'`
+
+Switch_action=$1
+
+#Check if it is null
+if [ -z ${Switch_action} ]; then
+    usage_msg
+    exit 0
+fi
+
+#Check if it is not one of the correct parameters
+if [ ${Switch_action} != "enable" -a ${Switch_action} != "disable" -a ${Switch_action} != "status" ]; then
+    usage_msg
+    exit 0
+fi
+
+#Check if there is a custom disable tls config already, if so then use it
+if [ -e ${CONFIG_DIR}/custom_disable_server.xml ]; then
+	DISABLE_CONFIG=${CONFIG_DIR}/custom_disable_server.xml
+else
+	DISABLE_CONFIG=${CONFIG_DIR}/disable_server.xml
+	if [ $? -ne 0 ]; then
+		_err_msg_="Could not find ${DISABLE_CONFIG}"
+		abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+	fi
+fi
+
+#Check if there is a custom enable tls config already, if so then use it
+if [ -e ${CONFIG_DIR}/custom_enable_server.xml ]; then
+	ENABLE_CONFIG=${CONFIG_DIR}/custom_enable_server.xml
+else
+	ENABLE_CONFIG=${CONFIG_DIR}/enable_server.xml
+	if [ $? -ne 0 ]; then
+		_err_msg_="Could not find ${ENABLE_CONFIG}"
+		abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+	fi
+fi
+
+#Get the checksum of the current config
+current_chksum=$(md5sum ${CURRENT_CONFIG} | $NAWK '{print $1}')
+if [ $? -ne 0 ]; then
+	_err_msg_="Could not get the checksum for ${CURRENT_CONFIG}"
+	abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+fi
+
+#Get the checksum for the config to compare it
+DISABLE_CHKSUM=$(md5sum ${DISABLE_CONFIG} | $NAWK '{print $1}')
+if [ $? -ne 0 ]; then
+	_err_msg_="Could not get checksum for ${DISABLE_CHKSUM}"
+	abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+fi
+
+#Get the checksum for the config to compare it
+ENABLE_CHKSUM==$(md5sum ${ENABLE_CONFIG} | $NAWK '{print $1}')
+if [ $? -ne 0 ]; then
+	_err_msg_="Could not get checksum for ${ENABLE_CHKSUM}"
+	abort_script "${_err_msg_}" "${EXEC_SHELL_CMD}"
+fi
+
+if [ ! "${LOGFILE}" ]; then
+    LOGFILE=${LOGFILE_DIR}/SecurityControlSwitch.log
+fi
+
+if [ ${Switch_action} == "enable" ]; then
+	enable_renegotiation
+elif [ ${Switch_action} == "disable" ]; then
+	disable_renegotiation
+else
+	tls_status
+fi

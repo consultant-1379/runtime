@@ -1,0 +1,58 @@
+<project name="runtime" default="compile" xmlns:sonar="antlib:org.sonar.ant">
+
+  <property name="pack.name" value="runtime"/> 
+  <property name="pack.version" value="5-0-0"/>
+  <!-- Attention! pack.dir have to be under tmp-dir because the actual build is done there -->
+  <property name="pack.dir" value="/proj/eiffel013_config_fem6s11/eiffel_home/jobs/Git_runtime_build/runtime/dev"/>
+
+  <!-- 3PP Jars -->
+  <property name="3pp.ant.dir" value="/proj/eiffel013_config_fem6s11/3pp/apache/ant/v1_10_8/prod"/>
+  <property name="3pp.jdk_i386.dir" value="/proj/eiffel013_config_fem6s11/3pp/java_sun/jdk_x86/v1_8_0_381/prod"/>
+  <property name="3pp.tomcat.dir" value="/proj/eiffel013_config_fem6s11/3pp/apache/tomcat/v9_0_78/prod"/>
+  <!-- User database jar is ENIQ implementation of the tomcat userdatabase -->
+  <property name="eniq.adminui_userdb.dir" value="/proj/eiffel013_config_fem6s11/eiffel_home/jobs/Git_runtime_build/adminui_userdb/build/adminui_userdb/"/>
+
+  <target name="precompile">
+
+    <mkdir dir="${pack.dir}/tomcat"/>
+    <copy todir="${pack.dir}/tomcat">
+      <fileset dir="${3pp.tomcat.dir}">
+        <include name="**/apache-tomcat-9.0.78.zip"/>
+      </fileset>
+    </copy>
+
+    <mkdir dir="${pack.dir}/adminui_userdb"/>
+    <copy todir="${pack.dir}/adminui_userdb">
+      <fileset dir="${eniq.adminui_userdb.dir}">
+        <include name="**/user-database.jar"/>
+      </fileset>
+    </copy>
+    
+    <mkdir dir="${pack.dir}/ant"/>
+    <copy todir="${pack.dir}/ant">
+      <fileset dir="${3pp.ant.dir}">
+        <include name="**/*.tar.gz"/>
+      </fileset>
+    </copy>
+
+    <mkdir dir="${pack.dir}/jdk"/>
+    <mkdir dir="${pack.dir}/jdk/x86_64"/>
+    <copy todir="${pack.dir}/jdk/x86_64">
+      <fileset dir="${3pp.jdk_i386.dir}">
+        <include name="**/*.tar.gz"/>
+      </fileset>
+    </copy>
+
+  </target>
+
+  <target name="compile"/>
+  <target name="postcompile">
+    <mkdir dir="${pack.dir}/install"/>
+    <delete dir="${pack.dir}/dclib"/>
+  </target>
+
+<target name="compile_sonar"/>
+<target name="sonar"/>
+<target name="sonarQualityCheck" />
+
+</project>

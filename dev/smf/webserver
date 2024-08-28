@@ -1,0 +1,278 @@
+#!/bin/bash
+# ********************************************************************
+# Ericsson Radio Systems AB                                     SCRIPT
+# ********************************************************************
+#
+#
+# (c) Ericsson Radio Systems AB 2018 - All rights reserved.
+#
+# The copyright to the computer program(s) herein is the property
+# of Ericsson Radio Systems AB, Sweden. The programs may be used 
+# and/or copied only with the written permission from Ericsson Radio 
+# Systems AB or in accordance with the terms and conditions stipulated 
+# in the agreement/contract under which the program(s) have been 
+# supplied.
+#
+# ********************************************************************
+# Name    : webserver
+# Date    : 13/07/2020(dummy date) Last modified 25/04/2023
+# Purpose : Ericsson Network IQ ETLC engine control script for SMF to use
+#
+# Based loosely on Tomcat catalina.sh-script
+# Usage   : webstart start|stop
+# ********************************************************************
+
+. /eniq/home/dcuser/.profile
+
+if [ -z "${CONF_DIR}" ] ; then
+  echo "ERROR: CONF_DIR is not set"
+  exit 1
+fi
+
+. ${CONF_DIR}/niq.rc
+
+
+# Source the common functions
+if [ -s /eniq/admin/lib/common_functions.lib ]; then
+    . /eniq/admin/lib/common_functions.lib
+else
+    _err_msg_="File /eniq/admin/lib/common_functions.lib not found"
+    abort_script "$_err_msg_"
+fi
+
+if [ -s ${CONF_DIR}/dwh.ini ]; then
+  START_COUNT=`iniget WEBSERVER -v StartCount -f ${CONF_DIR}/dwh.ini`
+  START_DELAY=`iniget WEBSERVER -v StartDelay -f ${CONF_DIR}/dwh.ini`
+  STOP_COUNT=`iniget WEBSERVER -v StopCount -f ${CONF_DIR}/dwh.ini`
+  STOP_DELAY=`iniget WEBSERVER -v StopDelay -f ${CONF_DIR}/dwh.ini`
+else
+  HEAP_SIZE=`iniget WEBSERVER -v WebserverHeap -f ${CONF_DIR}/niq.ini`
+  START_COUNT=`iniget WEBSERVER -v StartCount -f ${CONF_DIR}/niq.ini`
+  START_DELAY=`iniget WEBSERVER -v StartDelay -f ${CONF_DIR}/niq.ini`
+  STOP_COUNT=`iniget WEBSERVER -v StopCount -f ${CONF_DIR}/niq.ini`
+  STOP_DELAY=`iniget WEBSERVER -v StopDelay -f ${CONF_DIR}/niq.ini`
+fi
+
+# If WebserverHeap value or variable is not present in the niq.ini
+# file then setting the HEAP_SIZE to 512MB
+if [ -z "$HEAP_SIZE" ]; then
+      HEAP_SIZE=512M
+fi
+
+. ${BIN_DIR}/common_variables.lib
+export ANT_HOME
+
+JAVA_HOME=${RT_DIR}/java
+export JAVA_HOME
+
+JAVA_OPTS="$JAVA_OPTS "
+export JAVA_OPTS
+
+CATALINA_HOME=${RT_DIR}/tomcat
+
+if [ -r ${CATALINA_HOME}/bin/setclasspath.sh ] ; then
+  BASEDIR=${CATALINA_HOME}
+  . ${CATALINA_HOME}/bin/setclasspath.sh
+else
+  ${ECHO} "Cannot find ${CATALINA_HOME}/bin/setclasspath.sh"
+  exit 11
+fi
+
+
+for file in `${LS} ${IQ_DIR}/IQ-*/java/sajdbc[0-9].jar`
+do
+  CLASSPATH=/eniq/sentinel/Java/:${file}
+  break
+done
+
+CLASSPATH="${CLASSPATH}":"${CATALINA_HOME}"/bin/bootstrap.jar:"$CATALINA_HOME"/bin/tomcat-juli.jar:"$CATALINA_HOME"/bin/commons-logging-api.jar
+
+for eachJar in `${LS} /eniq/sw/runtime/tomcat/lib/*.jar` ; do
+        CLASSPATH=${CLASSPATH}:${eachJar}
+done
+#CLASSPATH=${CLASSPATH}:/eniq/sw/runtime/tomcat/lib/catalina.jar:/eniq/sw/runtime/tomcat/lib/tomcat-util.jar
+
+
+if [ -z "$CATALINA_BASE" ] ; then
+  CATALINA_BASE=${CATALINA_HOME}
+fi
+
+if [ -z "$CATALINA_TMPDIR" ] ; then
+  # Define the java.io.tmpdir to use for Catalina
+  CATALINA_TMPDIR=${CATALINA_BASE}/temp
+fi
+# when runtime is installed, engine isnt, to create the dir
+${MKDIR} -p ${LOG_DIR}/engine
+
+# Setting Webserver Start delay time and retry count
+WEBSERVER_START_COUNT=4
+WEBSERVER_START_DELAY=10
+
+start() {
+  #-----------
+  # To remove the session file if its already there on start of webserver ( TR HO75287 )
+  #-----------
+  sessionFilePath=${RT_DIR}"/tomcat/work/Catalina/localhost/adminui/SESSIONS.ser"
+  if [ -s ${sessionFilePath} ]
+  then
+        ${RM} -f ${sessionFilePath}
+  fi
+  if [ ! -d ${LOG_DIR}/adminui ] ; then
+    ${MKDIR} -p ${LOG_DIR}/adminui
+  fi
+
+  LOGFILE=${LOG_DIR}/engine/start_webserver_`${DATE} '+%y%m%d_%H%M%S'`.log
+  DATE_NOW=`${DATE} '+%H:%M:%S_%d-%b-%y'`
+  ${ECHO} "Starting Webserver @ $DATE_NOW" > ${LOGFILE}
+
+  #-----------
+  # To update the /eniq/sw/runtime/tomcat/conf/catalina.propertiese( TR HQ22755 )
+  #-----------
+  xmlFileName=${BIN_DIR}"/before_webserver_start.xml"
+
+  if [ -s ${xmlFileName} ]
+  then
+    ${RT_DIR}/ant/bin/ant -f ${BIN_DIR}/before_webserver_start.xml -Ddc.runtime.dir=${RT_DIR} -Ddc.platform.dir=${PLATFORM_DIR} -Ddc.log.dir=${LOG_DIR} >> /dev/null 2>&1
+
+        if [ $? -ne 0 ]
+        then
+          ${ECHO} "${RT_DIR}/ant/bin/ant not able to update /eniq/sw/runtime/tomcat/conf/catalina.properties." >> ${LOGFILE}
+        else
+          ${ECHO} "File /eniq/sw/runtime/tomcat/conf/catalina.properties is updated." >> ${LOGFILE}
+    fi
+  else
+    ${ECHO} "File ${xmlFileName} not found." >> ${LOGFILE}
+        ${ECHO} "File /eniq/sw/runtime/tomcat/conf/catalina.properties is not updated." >> ${LOGFILE}
+  fi
+
+  xPID=`${PS} -ef | ${GREP} java | ${GREP} "pname=WebServer" | ${NAWK} '{print $2}'`
+  if [ ! -z "${xPID}" ] ; then
+    ${ECHO} "Killing previous engine instance in PID ${xPID}" >> ${LOGFILE}
+    kill -9 ${xPID} 2>&1 | tee -a ${LOGFILE}
+    ${ECHO} "Previous webserver killed" >> ${LOGFILE}
+  fi
+
+  touch ${LOG_DIR}/adminui/catalina.out
+
+if [ -f ${PLATFORM_DIR}/common*/dclib/common.jar -a -f ${PLATFORM_DIR}/engine*/dclib/engine.jar -a -f ${PLATFORM_DIR}/licensing*/dclib/licensing.jar -a -f ${PLATFORM_DIR}/scheduler*/dclib/scheduler.jar ] ; then
+  COMMON_JAR=`${LS} ${PLATFORM_DIR}/common*/dclib/common.jar`
+  LICENSING_JAR=`${LS} ${PLATFORM_DIR}/licensing*/dclib/licensing.jar`
+  SCHEDULER_JAR=`${LS} ${PLATFORM_DIR}/scheduler*/dclib/scheduler.jar`
+  ENGINE_JAR=`${LS} ${PLATFORM_DIR}/engine*/dclib/engine.jar`
+  CODEBASE="file://${COMMON_JAR} file://${ENGINE_JAR} file://${LICENSING_JAR} file://${SCHEDULER_JAR} "
+  fi
+  
+ if [ -f ${PLATFORM_DIR}/symboliclinkcreator*/dclib/symboliclinkcreator.jar ] ; then
+  SYMLINK_JAR=`${LS} ${PLATFORM_DIR}/symboliclinkcreator*/dclib/symboliclinkcreator.jar`
+  CODEBASE="file://${COMMON_JAR} file://${ENGINE_JAR} file://${LICENSING_JAR} file://${SCHEDULER_JAR} file://${SYMLINK_JAR}"
+  fi
+
+
+  "$_RUNJAVA" $JAVA_OPTS $CATALINA_OPTS \
+    -mx${HEAP_SIZE} -DHEAP_SIZE=${HEAP_SIZE} \
+    -Dpname=WebServer \
+    -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" -classpath "$CLASSPATH" \
+    -Dcatalina.base="$CATALINA_BASE" \
+    -Dcatalina.home="$CATALINA_HOME" \
+    -Djava.io.tmpdir="$CATALINA_TMPDIR" \
+    -DLOG_DIR="${LOG_DIR}" \
+    -DCONF_DIR="${CONF_DIR}" \
+    -DRT_DIR="${RT_DIR}" \
+    -Djava.rmi.server.codebase="${CODEBASE}" \
+    -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager \
+	-Dlog4j2.configurationFile=file:/eniq/sw/runtime/apache-tomcat-9.0.78/webapps/adminui/conf/adminui.properties \
+    org.apache.catalina.startup.Bootstrap "$@" start \
+    >> ${LOG_DIR}/adminui/catalina.out 2>&1 &
+
+  DATE_NOW=`${DATE} '+%H:%M:%S_%d-%b-%y'`
+  ${ECHO} "Webserver forked @ $DATE_NOW" >> ${LOGFILE}
+
+  if [ ! -z "$CATALINA_PID" ]; then
+    ${ECHO} $! > $CATALINA_PID
+  fi
+
+  cnt=1
+
+  while [ ${cnt} -le ${WEBSERVER_START_COUNT} ] ; do
+    sleep ${WEBSERVER_START_DELAY}
+
+        DATE_NOW=`${DATE} '+%H:%M:%S_%d-%b-%y'`
+    ${ECHO} "Checking webserver status @ $DATE_NOW" >> ${LOGFILE}
+    ${BIN_DIR}/webserver status
+    if [ $? -eq 0 ] ; then
+      ${ECHO} "Webserver successfully started" >> ${LOGFILE}
+      exit 0
+    else
+      ${ECHO} "webserver not started yet" >> ${LOGFILE}
+          ${ECHO} "Retrying $cnt time" >> ${LOGFILE}
+      let cnt=cnt+1
+    fi
+
+  done
+
+  ${ECHO} "Webserver failed to start" >> ${LOGFILE}
+
+  exit 55
+}
+
+stop() {
+
+  LOGFILE=${LOG_DIR}/engine/stop_webserver_`${DATE} '+%y%m%d_%H%M%S'`.log
+
+  ${ECHO} "Stopping webserver..." > ${LOGFILE}
+
+  "$_RUNJAVA" $JAVA_OPTS $CATALINA_OPTS \
+    -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" -classpath "$CLASSPATH" \
+    -Dcatalina.base="$CATALINA_BASE" \
+    -Dcatalina.home="$CATALINA_HOME" \
+    -Djava.io.tmpdir="$CATALINA_TMPDIR" \
+    org.apache.catalina.startup.Bootstrap "$@" stop > /dev/null 2>&1
+
+  ${ECHO} "Webserver shutdown requested" >> ${LOGFILE}
+
+  cnt=0
+
+  while [ ${cnt} -lt ${STOP_COUNT} ] ; do
+    sleep ${STOP_DELAY}
+
+    ${ECHO} "Checking webserver status..." >> ${LOGFILE}
+    ePID=`${PS} -ef | ${GREP} java | ${GREP} "pname=WebServer" | ${NAWK} '{print $2}'`
+
+    if [ -z "${ePID}" ] ; then
+      ${ECHO} "Webserver shutdown is complete" >> ${LOGFILE}
+      exit 0
+    else
+      ${ECHO} "webserver is still running" >> ${LOGFILE}
+      let cnt=cnt+1
+    fi
+
+  done
+
+  ePID=`${PS} -ef | ${GREP} java | ${GREP} "pname=WebServer" | ${NAWK} '{print $2}'`
+
+  ${ECHO} "Webserver refused to stop trying to kill it." >> ${LOGFILE}
+
+  if [ ! -z "${ePID}" ] ; then
+    kill -9 ${ePID}
+    ${ECHO} "Webserver killed." >> ${LOGFILE}
+  else
+    ${ECHO} "Webserver was dead before killing" >> ${LOGFILE}
+  fi
+
+  exit 0
+
+}
+
+case "$1" in
+start)
+      start
+      ;;
+stop)
+      stop
+      ;;
+*)
+      ${ECHO} "This script shall only be used by SMF!"
+      exit 10
+      ;;
+esac
+

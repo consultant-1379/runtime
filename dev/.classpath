@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="var" path="VIEW_PATH/eniq_3pp/apache/xerces_impl/v2_0_2/prod/xercesImpl-2.0.2.jar"/>
+	<classpathentry kind="var" path="VIEW_PATH/eniq_3pp/apache/ant/v1_6_2/prod/ant.jar"/>
+	<classpathentry kind="var" path="VIEW_PATH/eniq_3pp/sybase/sybase_iq/v15_1/client/prod/jconn3.jar"/>
+	<classpathentry kind="output" path="classes"/>
+</classpath>

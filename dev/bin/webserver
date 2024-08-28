@@ -1,0 +1,324 @@
+#!/bin/bash
+# ********************************************************************
+# Ericsson Radio Systems AB                                     SCRIPT
+# ********************************************************************
+#
+#
+# (c) Ericsson Radio Systems AB 2018 - All rights reserved.
+#
+# The copyright to the computer program(s) herein is the property
+# of Ericsson Radio Systems AB, Sweden. The programs may be used 
+# and/or copied only with the written permission from Ericsson Radio 
+# Systems AB or in accordance with the terms and conditions stipulated 
+# in the agreement/contract under which the program(s) have been 
+# supplied.
+#
+# ********************************************************************
+# Name    : webserver
+# Date    : 13/07/2020(dummy date) Last modified 25/04/2023
+# Purpose : Ericsson Network IQ Webserver control script
+# Usage   : webserver start|stop|restart|status
+# ********************************************************************
+
+unalias stop 2> /dev/null
+
+. /eniq/home/dcuser/.profile
+
+if [ -z "$CONF_DIR" ] ; then
+  echo "ERROR: CONF_DIR is not set"
+  exit 1
+fi
+
+. ${CONF_DIR}/niq.rc
+
+if [ ${LOGNAME} != "dcuser"  ] ; then
+  echo "This script must be executed as dcuser"
+  exit 32
+fi
+
+TOMCAT_BACKUP_DIR=/eniq/backup/tomcat_back_up
+security_rollback_check=${TOMCAT_BACKUP_DIR}/Rollback_Summary
+ADMINUI_WEB_XML=${RT_DIR}/tomcat/webapps/adminui/WEB-INF/web.xml
+TOMCAT_WEB_XML=${RT_DIR}/tomcat/conf/web.xml
+LOGIN_FILE=${RT_DIR}/tomcat/webapps/adminui/login.jsp
+FEATURE_VM_FILE=${RT_DIR}/tomcat/webapps/adminui/WEB-INF/templates/feature_availability.vm
+FEATURE_INSTALL_VM_FILE=${RT_DIR}/tomcat/webapps/adminui/WEB-INF/templates/feature_availability_install.vm
+FEATURE_UPDATE_VM_FILE=${RT_DIR}/tomcat/webapps/adminui/WEB-INF/templates/feature_availability_update.vm
+
+tomcat_server_config_file=${RT_DIR}/tomcat/conf/server.xml
+
+
+if [[ ! -f $tomcat_server_config_file ]]; then
+  echo "$tomcat_server_config_file not accessible!"
+  exit 1
+fi
+
+start() {
+  #-----------
+  # To remove the session file if its already there on start of webserver
+  #-----------
+  sessionFilePath=${RT_DIR}"/tomcat/work/Catalina/localhost/adminui/SESSIONS.ser"
+  if [ -s ${sessionFilePath} ]
+  then
+  	rm -f ${sessionFilePath}
+  fi
+  
+  #------
+  # For login session retain
+  if [ -f /eniq/home/dcuser/.adminui_sessions_count ];then
+	  sessions_count=`cat /eniq/home/dcuser/.adminui_sessions_count`
+	  if ! [[ $sessions_count = '' ]]; then
+	  	string_to_search="maxSessions"
+		line_no=$(grep -n "$string_to_search" $ADMINUI_WEB_XML | cut -f1 -d:)
+		if ! [[ $line_no = '' ]]; then
+			line_to_modify=$(($line_no+1))
+			replacing_string="<param-value>$sessions_count<\/param-value>"
+			sed -i "${line_to_modify}s/.*/$replacing_string/g" $ADMINUI_WEB_XML
+			rm -f /eniq/home/dcuser/.adminui_sessions_count
+		fi
+	  
+	  fi
+  fi
+  
+  
+  #------
+  # For login session timeout retain
+  
+  if [ -f /eniq/sw/conf/.adminui_sessions_timeout ];then
+  sessions_timeout_count=`cat /eniq/sw/conf/.adminui_sessions_timeout`
+	  if ! [[ $sessions_timeout_count = '' ]]; then
+	  	string_to_search_session_timeout="session_timeout_in_minute"
+		line_no=$(grep -n "$string_to_search_session_timeout" $ADMINUI_WEB_XML | cut -f1 -d:)
+		if ! [[ $line_no = '' ]]; then
+			line_to_modify=$(($line_no+1))
+			replacing_string="<param-value>$sessions_timeout_count<\/param-value>"
+			sed -i "${line_to_modify}s/.*/$replacing_string/g" $ADMINUI_WEB_XML
+		fi	
+   	fi
+  fi
+  
+  
+  
+  #----------
+  # Setting up default mandatory properties.
+  #---------- 
+  
+  ### updating SSL properties
+
+  if [[ -z `grep -Poe '(?<=sslProtocol=").*?(?=")' $tomcat_server_config_file` ]]; then
+    sed -i "/clientAuth=/ s/^\(.*\)/\1 sslProtocol=\"TLSv1.2\"/" $tomcat_server_config_file
+  fi
+
+  if [[ ! -z `grep sslProtocol=\"TLSv1\" $tomcat_server_config_file` ]]; then
+    sed -i "s/sslProtocol=\".*\"/sslProtocol=\"TLSv1.2\"/" $tomcat_server_config_file
+  fi
+
+  if [[ -z `grep -Poe '(?<=sslEnabledProtocols=").*?(?=")' $tomcat_server_config_file` ]]; then
+    sed -i "/KeyAlias=/ s/^\(.*\)/\1 \nsslEnabledProtocols=\"TLSv1.2\"/" $tomcat_server_config_file
+  fi 
+
+  #----------
+  # If the Node Hardening is disabled!
+  
+  	if [ -d ${TOMCAT_BACKUP_DIR} ]; then
+		ls ${TOMCAT_BACKUP_DIR} | grep Rollback_Summary_ > /dev/null
+		if [ $? -eq 0 ];then
+			for file in `ls ${TOMCAT_BACKUP_DIR}/Rollback_Summary_*`; do 
+				mv $file ${TOMCAT_BACKUP_DIR}/Rollback_Summary
+			done
+		fi
+	fi
+  
+  #---------
+  ### updating org.apache.catalina.realm.LockOutRealm pfroperties.
+  	#VALUE=`$CAT $security_rollback_check |$GREP LOCKOUT |$AWK -F ":" '{print $2}'`
+	if [ -f $security_rollback_check ] && [ "`cat $security_rollback_check | grep LOCKOUT | awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		#echo "Found security features has been disabled manually on the system. Skipping the lockout security patches."
+		:
+	else
+  		if [[ -z `grep -Poe '(?<=failureCount=").*?(?=")' $tomcat_server_config_file` ]]; then 
+	    	sed -i "/className=\"org.apache.catalina.realm.LockOutRealm\"/ s/^\(.*\)\(>\)/\1 failureCount=\"3\"\2/" $tomcat_server_config_file
+	  	fi
+	  
+	 	if [[ -z `grep -Poe '(?<=lockOutTime=").*?(?=")' $tomcat_server_config_file` ]]; then 
+	    	sed -i "/className=\"org.apache.catalina.realm.LockOutRealm\"/ s/^\(.*\)\(>\)/\1 lockOutTime=\"3600\"\2/" $tomcat_server_config_file
+	  	fi
+	fi 
+	
+	  ### Cipher properties.
+	#VALUE=`$CAT $security_rollback_check |$GREP CIPHER_PROP |$AWK -F ":" '{print $2}'`
+	if [ -f $security_rollback_check ] && [ "`cat $security_rollback_check | grep CIPHER_PROP | awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		#echo "Found security features has been disabled manually on the system. Skipping the Cipher security patches."
+		:
+	else 
+	  if [[ -z `grep -Poe '(?<=SSLCipherSuite=").*?(?=")' $tomcat_server_config_file` ]]; then 
+	    sed -i "/sslProtocol=/ s/^\(.*\)\(\/>\|$\)/\1 \nSSLCipherSuite=\"HIGH:!SHA\"\2/" $tomcat_server_config_file
+	  fi
+	
+	  if [[ -z `grep -Poe '(?<=SSLHonorCipherOrder=").*?(?=")' $tomcat_server_config_file` ]]; then 
+	    sed -i "/SSLCipherSuite=/ s/^\(.*\)\(\/>\|$\)/\1 \nSSLHonorCipherOrder=\"true\"\2/" $tomcat_server_config_file 
+	  fi
+
+  	fi
+  	
+  	### X-Frame-Option.
+	if [ -f $security_rollback_check ] && [ "`cat $security_rollback_check | grep CLICKJACKING_ATTACKS_AND_HSTS | awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		grep "<filter>" ${ADMINUI_WEB_XML} > /dev/null
+		if [ $? -eq 0 ];then
+			sed -i '/<filter>/,/<\/filter>/d' ${ADMINUI_WEB_XML}
+		fi
+		
+		grep "<filter-mapping>" ${ADMINUI_WEB_XML} > /dev/null
+  		if [ $? -eq 0 ];then
+			sed -i '/<filter-mapping>/,/<\/filter-mapping>/d' ${ADMINUI_WEB_XML}
+		fi
+	fi 
+	
+	#### Secure session
+	if [ -f ${security_rollback_check} ] && [ "`cat $security_rollback_check | grep  SECURE_SESSION |awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		STRING_TO_SEARCH="<cookie-config>"
+		grep $STRING_TO_SEARCH ${TOMCAT_WEB_XML} > /dev/null
+		if [ $? -eq 0 ]; then
+			sed -i '/<cookie-config>/,/<\/cookie-config>/d' ${TOMCAT_WEB_XML}
+		fi
+	fi
+	
+	#### HSTS and X-FRAME-Option
+	if [ -f $security_rollback_check ] && [ "`cat $security_rollback_check | grep CLICKJACKING_ATTACKS_AND_HSTS | awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		list_param="antiClickJackingOption hstsEnabled hstsMaxAgeSeconds hstsIncludeSubDomains"
+		for param in $list_param
+		do
+		    myval="<param-name>$param<\/param-name>"
+			line_no=$(grep -n "$myval" ${TOMCAT_WEB_XML} | cut -f1 -d:)
+			if [[ $line_no = '' ]]; then
+				:
+			else
+				line_to_modify_start=$(($line_no-1))
+				line_to_modify_end=$(($line_no+2))
+				sed -e "$line_to_modify_start","$line_to_modify_end"'d' ${TOMCAT_WEB_XML} > ${TOMCAT_WEB_XML}"_tmp"
+				mv ${TOMCAT_WEB_XML}"_tmp" ${TOMCAT_WEB_XML}
+				grep "$myval"  ${TOMCAT_WEB_XML} > /dev/null
+				if [ $? -eq 0 ]; then
+					sed "/$myval/d" ${TOMCAT_WEB_XML} > ${TOMCAT_WEB_XML}"_tmp"
+					mv ${TOMCAT_WEB_XML}"_tmp" ${TOMCAT_WEB_XML}
+					#grep "$myval"  ${TOMCAT_WEB_XML} > /dev/null
+					#if [ $? -eq 0 ]; then
+					#	return 1
+					#fi
+				fi
+			fi
+		done
+	
+		list_val="FORWARD INCLUDE ERROR"
+		for var in $list_val
+		do
+		    myval="<dispatcher>$var<\/dispatcher>"
+			grep "$myval"  ${TOMCAT_WEB_XML} > /dev/null
+			if [ $? -eq 0 ]; then
+				sed "/$myval/d" ${TOMCAT_WEB_XML} > ${TOMCAT_WEB_XML}"_tmp"
+				mv ${TOMCAT_WEB_XML}"_tmp" ${TOMCAT_WEB_XML}
+				#grep "$myval"  ${TOMCAT_WEB_XML} > /dev/null
+				#if [ $? -eq 0 ]; then
+				#	return 1
+				#fi
+			fi
+		done
+			
+	fi 
+	
+	
+	### Auto-complete.
+	if [ -f $security_rollback_check ] && [ "`cat $security_rollback_check | grep AUTO_COMPLETE | awk -F ":" '{print $2}'`" == "FALSE" ]; then
+		grep 'autocomplete' ${LOGIN_FILE} > /dev/null
+		if [ $? -eq 0 ];then
+			sed -i 's/autocomplete=\"off\"//i' ${LOGIN_FILE}
+		fi
+		
+		grep 'autocomplete' ${FEATURE_VM_FILE} > /dev/null
+		if [ $? -eq 0 ];then
+			sed -i 's/autocomplete=\"off\"//i' ${FEATURE_VM_FILE}
+		fi
+		
+		grep 'autocomplete' ${FEATURE_INSTALL_VM_FILE} > /dev/null
+		if [ $? -eq 0 ];then
+			sed -i 's/autocomplete=\"off\"//i' ${FEATURE_INSTALL_VM_FILE}
+		fi
+		
+		grep 'autocomplete' ${FEATURE_UPDATE_VM_FILE} > /dev/null
+		if [ $? -eq 0 ];then
+			sed -i 's/autocomplete=\"off\"//i' ${FEATURE_UPDATE_VM_FILE}
+		fi
+	fi 
+	
+  
+  ### Updating some properties via ant.
+ 
+  ${RT_DIR}/ant/bin/ant -f ${BIN_DIR}/before_webserver_start.xml -Ddc.runtime.dir=${RT_DIR} -Ddc.platform.dir=${PLATFORM_DIR} -Ddc.log.dir=${LOG_DIR} >> /dev/null 2>&1
+  
+  #----------
+  # calling service starter.
+  #----------  
+  if [ -s ${SMF_BIN_DIR}/eniq_service_start_stop.bsh ]; then
+    ${SMF_BIN_DIR}/eniq_service_start_stop.bsh -s webserver -a start
+  else
+  	${ADMIN_BIN}/eniq_service_start_stop.bsh -s webserver -a start
+  fi
+}
+
+stop() {
+
+if [ -f ${ADMINUI_WEB_XML} ];then
+	string_to_search="maxSessions"
+	line_no=$(grep -n "$string_to_search" $ADMINUI_WEB_XML | cut -f1 -d:)
+	if ! [[ $line_no = '' ]]; then
+		line_to_modify=$(($line_no+1))
+		sessions_count=`sed $line_to_modify'q;d' $ADMINUI_WEB_XML | grep -oP '(?<=<param-value>).*?(?=</param-value>)'`
+		echo $sessions_count > /eniq/home/dcuser/.adminui_sessions_count
+	fi	
+fi
+
+  if [ -s ${SMF_BIN_DIR}/eniq_service_start_stop.bsh ]; then
+    ${SMF_BIN_DIR}/eniq_service_start_stop.bsh -s webserver -a stop
+  else
+  	${ADMIN_BIN}/eniq_service_start_stop.bsh -s webserver -a stop
+  fi
+}
+
+status() {
+
+  port=`netstat -an |grep -w LISTEN |grep -o ':8443'` >> /dev/null 2>&1
+
+  if [ ! -z ${port} ] && [ ${port} == ':8443' ] ; then
+    ECODE=0
+    echo "webserver is running OK"
+  else
+    ECODE=89
+    echo "webserver is not running"
+  fi
+
+  if [ -f /tmp/EniqMain ] ; then
+    rm -f /tmp/EniqMain
+  fi 
+    
+  exit ${ECODE}
+}
+
+case "$1" in
+start)
+      start
+      ;;
+stop)
+     stop
+     ;;
+restart)
+     stop
+     start
+     ;;
+status)
+     status
+     ;;
+*)
+     echo "Usage: webserver start|stop|restart|status"
+     exit 10
+     ;;
+esac

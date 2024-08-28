@@ -1,0 +1,185 @@
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_raw') then
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_raw',22,36,22,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_plain') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_plain',22,36,22,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_count') then
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_count',22,36,22,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_raw') then
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_raw',67,558,67,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_count') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_count',67,558,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_raw') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_raw',67,288,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_count') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_count',67,288,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_raw') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_raw',67,126,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_count') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_count',67,126,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_raw') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_raw',67,126,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_count') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_count',67,126,67,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_plain') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_plain',90,126,90,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_plain') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_plain',187,288,187,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_plain') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_plain',187,288,187,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_plain') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_plain',187,288,187,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_day') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_day',300,558,300,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_daybh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_daybh',300,558,300,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extralarge_rankbh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extralarge_rankbh',300,558,300,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_day') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_day',821,7218,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_daybh') then
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_daybh',821,7218,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='extrasmall_rankbh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('extrasmall_rankbh',821,7218,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_day') then
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_day',821,3618,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_daybh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_daybh',821,3618,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='small_rankbh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('small_rankbh',821,3618,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_day') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_day',821,1620,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_daybh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_daybh',821,1620,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='medium_rankbh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('medium_rankbh',821,1620,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_day') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_day',821,1620,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_daybh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_daybh',821,1620,821,0) 
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='large_rankbh') then  
+   insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('large_rankbh',821,1620,821,0) 
+end if;
+
+--Partitions for ENIQ Events (VOLUME BASED)
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgeh_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgeh_raw',2472981840,187500000,2472981840,1)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgeh_raw_lev2') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgeh_raw_lev2',22256836560,1875000000,22256836560,1)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextralarge_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextralarge_raw',6182454600,150000000,6182454600,1)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehlarge_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehlarge_raw',12364909200,600000000,12364909200,1)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehmedium_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehmedium_raw',618245460,150000000,618245460,1)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehsmall_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehsmall_raw',450000000,37500000,450000000,1)
+end if;
+
+
+--Partitions for ENIQ Events (TIME BASED)
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgeh_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgeh_1min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgeh_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgeh_15min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgeh_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgeh_day',821,3240,821,0)
+end if;
+
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehlarge_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehlarge_1min',10,36,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehlarge_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehlarge_15min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehlarge_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehlarge_day',22,252,22,0)
+end if;
+
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehmedium_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehmedium_1min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehmedium_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehmedium_15min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehmedium_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehmedium_day',22,126,22,0)
+end if;
+
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehsmall_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehsmall_1min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehsmall_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehsmall_15min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehsmall_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehsmall_day',22,252,22,0)
+end if;
+
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextralarge_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextralarge_1min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextralarge_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextralarge_15min',67,252,67,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextralarge_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextralarge_day',821,1620,821,0)
+end if;
+
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextrasmall_1min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextrasmall_1min',10,126,10,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextrasmall_15min') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextrasmall_15min',22,126,22,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='sgehextrasmall_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('sgehextrasmall_day',821,1620,821,0)
+end if;
+
+--Partitions for NetAn (TIME BASED)
+if not exists (select 1 from PartitionPlan_temp where partitionplan='cv_day') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('cv_day',821,1350,821,0)
+end if;
+if not exists (select 1 from PartitionPlan_temp where partitionplan='cv_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('cv_raw',67,126,67,0)
+end if;
+
+--Partitions for ENIQ Stats (BULK CM)
+if not exists (select 1 from PartitionPlan_temp where partitionplan='bulk_cm_raw') then
+  insert into PartitionPlan_temp (partitionplan,defaultstoragetime,defaultpartitionsize,maxstoragetime,partitiontype) values ('bulk_cm_raw',821,3618,821,0)
+end if;
